@@ -1,0 +1,29 @@
+private void MapView_MouseMove(object sender, MouseEventArgs e)
+{
+    if (!_dragging || _activeDot == null) return;
+
+    var mapPt = _mapView.ScreenToLocation(e.GetPosition(_mapView));
+    if (mapPt == null) return;
+
+    // 1) move dot (keep dot in the map's SR, e.g. 3857)
+    _activeDot.Geometry = mapPt;
+
+    // 2) move circle: rebuild buffer from the new center
+    if (_radiusByDot.TryGetValue(_activeDot, out var circle))
+    {
+        // buffer in WGS84 so "meters" radius is correct
+        var centerWgs = mapPt.SpatialReference == SpatialReferences.Wgs84
+            ? mapPt
+            : (MapPoint)GeometryEngine.Project(mapPt, SpatialReferences.Wgs84);
+
+        var circleWgs = GeometryEngine.BufferGeodetic(
+            centerWgs,
+            _radiusMeters,
+            LinearUnits.Meters,
+            double.NaN,
+            GeodeticCurveType.Geodesic);
+
+        // project back to map SR for drawing
+        circle.Geometry = GeometryEngine.Project(circleWgs, _mapView.SpatialReference);
+    }
+}
