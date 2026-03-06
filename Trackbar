@@ -1,0 +1,101 @@
+using System;
+using System.Linq;
+using System.Windows.Forms;
+using Esri.ArcGISRuntime.UI.Controls;
+
+public partial class MainForm : Form
+{
+    private MapView _mapView;
+
+    // Smaller number = more zoomed in
+    private readonly double[] _scales =
+    {
+        5000000,
+        2000000,
+        1000000,
+        500000,
+        250000,
+        100000,
+        50000,
+        25000,
+        10000,
+        5000,
+        2500,
+        1000
+    };
+
+    private bool _syncingSlider;
+
+    public MainForm()
+    {
+        InitializeComponent();
+        SetupMap();
+        SetupZoomUi();
+    }
+
+    private void SetupMap()
+    {
+        _mapView = (MapView)elementHost1.Child;
+
+        // Keep slider synced when user zooms with mouse wheel or touch
+        _mapView.ViewpointChanged += MapView_ViewpointChanged;
+    }
+
+    private void SetupZoomUi()
+    {
+        trackBarZoom.Minimum = 0;
+        trackBarZoom.Maximum = _scales.Length - 1;
+        trackBarZoom.Value = 0;
+
+        trackBarZoom.ValueChanged += TrackBarZoom_ValueChanged;
+
+        btnZoomIn.Click += async (_, __) =>
+        {
+            int next = Math.Min(trackBarZoom.Value + 1, trackBarZoom.Maximum);
+            trackBarZoom.Value = next;
+        };
+
+        btnZoomOut.Click += async (_, __) =>
+        {
+            int next = Math.Max(trackBarZoom.Value - 1, trackBarZoom.Minimum);
+            trackBarZoom.Value = next;
+        };
+    }
+
+    private async void TrackBarZoom_ValueChanged(object sender, EventArgs e)
+    {
+        if (_syncingSlider || _mapView == null)
+            return;
+
+        double targetScale = _scales[trackBarZoom.Value];
+        await _mapView.SetViewpointScaleAsync(targetScale);
+    }
+
+    private void MapView_ViewpointChanged(object sender, EventArgs e)
+    {
+        if (_mapView == null || double.IsNaN(_mapView.MapScale))
+            return;
+
+        double currentScale = _mapView.MapScale;
+
+        int nearestIndex = 0;
+        double nearestDiff = double.MaxValue;
+
+        for (int i = 0; i < _scales.Length; i++)
+        {
+            double diff = Math.Abs(_scales[i] - currentScale);
+            if (diff < nearestDiff)
+            {
+                nearestDiff = diff;
+                nearestIndex = i;
+            }
+        }
+
+        if (trackBarZoom.Value != nearestIndex)
+        {
+            _syncingSlider = true;
+            trackBarZoom.Value = nearestIndex;
+            _syncingSlider = false;
+        }
+    }
+}
