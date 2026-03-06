@@ -1,15 +1,20 @@
 using System;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 
-public class VerticalZoomSlider : Control
+public class MapZoomControl : Control
 {
     public event EventHandler? ValueChanged;
 
     private int _minimum = 0;
     private int _maximum = 10;
     private int _value = 5;
+
     private bool _dragging;
+
+    private Rectangle _plusButton;
+    private Rectangle _minusButton;
 
     public int Minimum
     {
@@ -28,21 +33,21 @@ public class VerticalZoomSlider : Control
         get => _value;
         set
         {
-            int newValue = Math.Max(_minimum, Math.Min(_maximum, value));
-            if (_value != newValue)
+            int v = Math.Max(_minimum, Math.Min(_maximum, value));
+            if (_value != v)
             {
-                _value = newValue;
+                _value = v;
                 Invalidate();
                 ValueChanged?.Invoke(this, EventArgs.Empty);
             }
         }
     }
 
-    public VerticalZoomSlider()
+    public MapZoomControl()
     {
+        Width = 60;
+        Height = 260;
         DoubleBuffered = true;
-        Width = 50;
-        Height = 220;
         BackColor = Color.White;
     }
 
@@ -51,45 +56,88 @@ public class VerticalZoomSlider : Control
         base.OnPaint(e);
 
         var g = e.Graphics;
-        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+        g.SmoothingMode = SmoothingMode.AntiAlias;
 
-        int railX = Width / 2;
-        int top = 20;
-        int bottom = Height - 20;
+        int centerX = Width / 2;
+
+        int btnSize = 36;
+
+        _plusButton = new Rectangle(centerX - btnSize / 2, 6, btnSize, btnSize);
+        _minusButton = new Rectangle(centerX - btnSize / 2, Height - btnSize - 6, btnSize, btnSize);
+
+        DrawRoundButton(g, _plusButton, "+");
+        DrawRoundButton(g, _minusButton, "−");
+
+        int railTop = _plusButton.Bottom + 10;
+        int railBottom = _minusButton.Top - 10;
 
         using var railPen = new Pen(Color.LightGray, 4);
-        g.DrawLine(railPen, railX, top, railX, bottom);
+        g.DrawLine(railPen, centerX, railTop, centerX, railBottom);
 
         int steps = _maximum - _minimum;
         if (steps <= 0) steps = 1;
 
         for (int i = 0; i <= steps; i++)
         {
-            int y = top + (bottom - top) * i / steps;
-            g.DrawLine(Pens.Gray, railX - 8, y, railX + 8, y);
+            int y = railTop + (railBottom - railTop) * i / steps;
+            g.DrawLine(Pens.Gray, centerX - 8, y, centerX + 8, y);
         }
 
         float ratio = (float)(_value - _minimum) / (_maximum - _minimum == 0 ? 1 : _maximum - _minimum);
-        int thumbY = bottom - (int)((bottom - top) * ratio);
+        int thumbY = railBottom - (int)((railBottom - railTop) * ratio);
 
-        var thumbRect = new Rectangle(railX - 10, thumbY - 10, 20, 20);
-        using var thumbBrush = new SolidBrush(Color.DodgerBlue);
-        g.FillEllipse(thumbBrush, thumbRect);
-        g.DrawEllipse(Pens.White, thumbRect);
+        Rectangle thumb = new Rectangle(centerX - 10, thumbY - 10, 20, 20);
+
+        using var brush = new SolidBrush(Color.DodgerBlue);
+        g.FillEllipse(brush, thumb);
+        g.DrawEllipse(Pens.White, thumb);
+    }
+
+    private void DrawRoundButton(Graphics g, Rectangle rect, string text)
+    {
+        using var brush = new SolidBrush(Color.White);
+        using var pen = new Pen(Color.LightGray);
+
+        g.FillEllipse(brush, rect);
+        g.DrawEllipse(pen, rect);
+
+        using var font = new Font("Segoe UI", 14, FontStyle.Bold);
+        var size = g.MeasureString(text, font);
+
+        g.DrawString(
+            text,
+            font,
+            Brushes.Black,
+            rect.X + (rect.Width - size.Width) / 2,
+            rect.Y + (rect.Height - size.Height) / 2 - 2);
     }
 
     protected override void OnMouseDown(MouseEventArgs e)
     {
         base.OnMouseDown(e);
+
+        if (_plusButton.Contains(e.Location))
+        {
+            Value++;
+            return;
+        }
+
+        if (_minusButton.Contains(e.Location))
+        {
+            Value--;
+            return;
+        }
+
         _dragging = true;
-        UpdateValueFromY(e.Y);
+        UpdateValue(e.Y);
     }
 
     protected override void OnMouseMove(MouseEventArgs e)
     {
         base.OnMouseMove(e);
+
         if (_dragging)
-            UpdateValueFromY(e.Y);
+            UpdateValue(e.Y);
     }
 
     protected override void OnMouseUp(MouseEventArgs e)
@@ -98,14 +146,17 @@ public class VerticalZoomSlider : Control
         _dragging = false;
     }
 
-    private void UpdateValueFromY(int y)
+    private void UpdateValue(int mouseY)
     {
-        int top = 20;
-        int bottom = Height - 20;
+        int btnSize = 36;
 
-        y = Math.Max(top, Math.Min(bottom, y));
+        int railTop = btnSize + 16;
+        int railBottom = Height - btnSize - 16;
 
-        float ratio = (float)(bottom - y) / (bottom - top);
+        mouseY = Math.Max(railTop, Math.Min(railBottom, mouseY));
+
+        float ratio = (float)(railBottom - mouseY) / (railBottom - railTop);
+
         Value = _minimum + (int)Math.Round(ratio * (_maximum - _minimum));
     }
 }
