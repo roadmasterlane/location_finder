@@ -1,0 +1,111 @@
+using System;
+using System.Drawing;
+using System.Windows.Forms;
+
+public class VerticalZoomSlider : Control
+{
+    public event EventHandler? ValueChanged;
+
+    private int _minimum = 0;
+    private int _maximum = 10;
+    private int _value = 5;
+    private bool _dragging;
+
+    public int Minimum
+    {
+        get => _minimum;
+        set { _minimum = value; Invalidate(); }
+    }
+
+    public int Maximum
+    {
+        get => _maximum;
+        set { _maximum = value; Invalidate(); }
+    }
+
+    public int Value
+    {
+        get => _value;
+        set
+        {
+            int newValue = Math.Max(_minimum, Math.Min(_maximum, value));
+            if (_value != newValue)
+            {
+                _value = newValue;
+                Invalidate();
+                ValueChanged?.Invoke(this, EventArgs.Empty);
+            }
+        }
+    }
+
+    public VerticalZoomSlider()
+    {
+        DoubleBuffered = true;
+        Width = 50;
+        Height = 220;
+        BackColor = Color.White;
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        base.OnPaint(e);
+
+        var g = e.Graphics;
+        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
+        int railX = Width / 2;
+        int top = 20;
+        int bottom = Height - 20;
+
+        using var railPen = new Pen(Color.LightGray, 4);
+        g.DrawLine(railPen, railX, top, railX, bottom);
+
+        int steps = _maximum - _minimum;
+        if (steps <= 0) steps = 1;
+
+        for (int i = 0; i <= steps; i++)
+        {
+            int y = top + (bottom - top) * i / steps;
+            g.DrawLine(Pens.Gray, railX - 8, y, railX + 8, y);
+        }
+
+        float ratio = (float)(_value - _minimum) / (_maximum - _minimum == 0 ? 1 : _maximum - _minimum);
+        int thumbY = bottom - (int)((bottom - top) * ratio);
+
+        var thumbRect = new Rectangle(railX - 10, thumbY - 10, 20, 20);
+        using var thumbBrush = new SolidBrush(Color.DodgerBlue);
+        g.FillEllipse(thumbBrush, thumbRect);
+        g.DrawEllipse(Pens.White, thumbRect);
+    }
+
+    protected override void OnMouseDown(MouseEventArgs e)
+    {
+        base.OnMouseDown(e);
+        _dragging = true;
+        UpdateValueFromY(e.Y);
+    }
+
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        base.OnMouseMove(e);
+        if (_dragging)
+            UpdateValueFromY(e.Y);
+    }
+
+    protected override void OnMouseUp(MouseEventArgs e)
+    {
+        base.OnMouseUp(e);
+        _dragging = false;
+    }
+
+    private void UpdateValueFromY(int y)
+    {
+        int top = 20;
+        int bottom = Height - 20;
+
+        y = Math.Max(top, Math.Min(bottom, y));
+
+        float ratio = (float)(bottom - y) / (bottom - top);
+        Value = _minimum + (int)Math.Round(ratio * (_maximum - _minimum));
+    }
+}
