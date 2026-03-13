@@ -27,3 +27,34 @@ private void MapView_MouseMove(object sender, MouseEventArgs e)
         circle.Geometry = GeometryEngine.Project(circleWgs, _mapView.SpatialReference);
     }
 }
+
+
+private Marker HitTestMarker(System.Windows.Point clickPoint, IEnumerable<Marker> markers)
+{
+    const double tolerancePixels = 12;
+
+    Marker best = null;
+    double bestDistance = double.MaxValue;
+
+    foreach (var marker in markers)
+    {
+        if (marker.Location == null)
+            continue;
+
+        // Convert map coordinate -> screen coordinate
+        System.Windows.Point markerScreenPoint = mapView.LocationToScreen(marker.Location);
+
+        double dx = clickPoint.X - markerScreenPoint.X;
+        double dy = clickPoint.Y - markerScreenPoint.Y;
+        double distance = Math.Sqrt(dx * dx + dy * dy);
+
+        if (distance <= tolerancePixels && distance < bestDistance)
+        {
+            bestDistance = distance;
+            best = marker;
+        }
+    }
+
+    return best;
+}
+
