@@ -58,3 +58,19 @@ private Marker HitTestMarker(System.Windows.Point clickPoint, IEnumerable<Marker
     return best;
 }
 
+MapPoint pointForDisplay = marker.Location;
+
+if (pointForDisplay.SpatialReference == null)
+    return null; // or skip
+
+if (mapView.SpatialReference != null &&
+    !pointForDisplay.SpatialReference.Equals(mapView.SpatialReference))
+{
+    pointForDisplay = (MapPoint)Esri.ArcGISRuntime.Geometry.GeometryEngine.Project(
+        pointForDisplay,
+        mapView.SpatialReference);
+}
+
+System.Windows.Point markerScreenPoint = mapView.LocationToScreen(pointForDisplay);
+
+
