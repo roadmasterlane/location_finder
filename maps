@@ -74,3 +74,364 @@ if (mapView.SpatialReference != null &&
 System.Windows.Point markerScreenPoint = mapView.LocationToScreen(pointForDisplay);
 
 
+
+
+
+private async Task<Marker> HitTestMarkerAsync(System.Windows.Point screenPoint)
+{
+    var identifyResult = await mapView.IdentifyGraphicsOverlayAsync(
+        _markerOverlay,
+        screenPoint,
+        HitTolerancePixels,
+        false,
+        10);
+
+    if (identifyResult?.Graphics == null || identifyResult.Graphics.Count == 0)
+        return null;
+
+    // Prefer dot hit over circle hit if both are returned
+    var hitGraphic = identifyResult.Graphics
+        .OrderBy(g => g.Attributes["GraphicType"]?.ToString() == "Dot" ? 0 : 1)
+        .FirstOrDefault();
+
+    if (hitGraphic == null || !hitGraphic.Attributes.ContainsKey("MarkerId"))
+        return null;
+
+    var markerId = hitGraphic.Attributes["MarkerId"]?.ToString();
+    return _markers.FirstOrDefault(m => m.Id == markerId);
+}
+
+
+
+
+
+private System.Windows.Point _mouseDownScreenPoint;
+
+private async void MapView_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+{
+    try
+    {
+        mapView.Focus();
+
+        _mouseDownScreenPoint = e.GetPosition(mapView);
+        _mouseMovedWhileDown = false;
+        _isDragging = false;
+        _dragMarker = null;
+
+        var hitMarker = await HitTestMarkerAsync(_mouseDownScreenPoint);
+
+        if (hitMarker != null)
+        {
+            SelectMarker(hitMarker);
+
+            if (hitMarker.Draggable)
+            {
+                _dragMarker = hitMarker;
+            }
+
+            e.Handled = true;
+        }
+        else
+        {
+            ClearSelection();
+        }
+    }
+    catch (Exception ex)
+    {
+        // log ex
+    }
+}
+
+
+
+
+
+private void MapView_MouseMove(object sender, MouseEventArgs e)
+{
+    try
+    {
+        if (_dragMarker == null || e.LeftButton != MouseButtonState.Pressed)
+            return;
+
+        var currentScreen = e.GetPosition(mapView);
+
+        double dx = currentScreen.X - _mouseDownScreenPoint.X;
+        double dy = currentScreen.Y - _mouseDownScreenPoint.Y;
+
+        if (!_isDragging)
+        {
+            if (Math.Abs(dx) < DragStartThresholdPixels && Math.Abs(dy) < DragStartThresholdPixels)
+                return;
+
+            _isDragging = true;
+            _mouseMovedWhileDown = true;
+        }
+
+        var mapPoint = mapView.ScreenToLocation(currentScreen);
+        if (mapPoint == null)
+            return;
+
+        MoveMarker(_dragMarker, mapPoint, currentScreen);
+        RaiseSelectedMarkerCoordinates(_dragMarker);
+
+        e.Handled = true;
+    }
+    catch (Exception ex)
+    {
+        // log ex
+    }
+}
+
+
+
+
+private async void MapView_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+{
+    try
+    {
+        var mouseUpPoint = e.GetPosition(mapView);
+
+        // Case 1: drag finished
+        if (_isDragging && _dragMarker != null)
+        {
+            _isDragging = false;
+            _dragMarker = null;
+            e.Handled = true;
+            return;
+        }
+
+        // Case 2: plain click on empty map => create marker
+        var hitMarker = await HitTestMarkerAsync(mouseUpPoint);
+
+        if (!_mouseMovedWhileDown && hitMarker == null)
+        {
+            var mapPoint = mapView.ScreenToLocation(mouseUpPoint);
+            if (mapPoint != null)
+            {
+                double radiusMeters = GetRadiusFromDropdown();
+                var marker = CreateMarker(mapPoint, radiusMeters);
+                marker.ScreenPoint = mouseUpPoint;
+
+                SelectMarker(marker);
+            }
+        }
+
+        _dragMarker = null;
+        _isDragging = false;
+        _mouseMovedWhileDown = false;
+    }
+    catch (Exception ex)
+    {
+        // log ex
+    }
+}
+
+
+
+
+private void MoveMarker(Marker marker, MapPoint newMapPoint, System.Windows.Point newScreenPoint)
+{
+    marker.Geolocation = newMapPoint;
+    marker.ScreenPoint = newScreenPoint;
+
+    marker.DotGraphic.Geometry = newMapPoint;
+    marker.CircleGraphic.Geometry = CreateRadiusCircle(newMapPoint, marker.RadiusMeters);
+}
+
+
+
+private void MapCtrl_KeyDown(object sender, System.Windows.Forms.KeyEventArgs e)
+{
+    if (e.KeyCode == Keys.Delete && _selectedMarker != null)
+    {
+        DeleteMarker(_selectedMarker);
+        e.Handled = true;
+    }
+}
+
+private void DeleteMarker(Marker marker)
+{
+    if (marker == null)
+        return;
+
+    _markerOverlay.Graphics.Remove(marker.DotGraphic);
+    _markerOverlay.Graphics.Remove(marker.CircleGraphic);
+    _markers.Remove(marker);
+
+    if (_selectedMarker == marker)
+        _selectedMarker = null;
+}
+
+
+
+private void RadiusComboBox_SelectedIndexChanged(object sender, EventArgs e)
+{
+    if (_selectedMarker == null)
+        return;
+
+    double radiusMeters = GetRadiusFromDropdown();
+    _selectedMarker.RadiusMeters = radiusMeters;
+    _selectedMarker.CircleGraphic.Geometry = CreateRadiusCircle(_selectedMarker.Geolocation, radiusMeters);
+}
+
+private double GetRadiusFromDropdown()
+{
+    if (RadiusComboBox?.SelectedItem == null)
+        return 50;
+
+    // Example: combo items like "25", "50", "100"
+    if (double.TryParse(RadiusComboBox.SelectedItem.ToString(), out double value))
+        return value;
+
+    return 50;
+}
+
+
+
+private void HookMarkerEvents()
+{
+    SelectedMarkerWgs84Changed += (lon, lat) =>
+    {
+        txtX.Text = lon.ToString("F6");
+        txtY.Text = lat.ToString("F6");
+    };
+}
+
+
+
+private void HookMarkerEvents()
+{
+    SelectedMarkerWgs84Changed += (lon, lat) =>
+    {
+        txtX.Text = lon.ToString("F6");
+        txtY.Text = lat.ToString("F6");
+    };
+}
+
+
+private async Task<Marker> HitTestMarkerAsync(System.Windows.Point screenPoint)
+{
+    var identifyResult = await mapView.IdentifyGraphicsOverlayAsync(
+        _markerOverlay,
+        screenPoint,
+        HitTolerancePixels,
+        false,
+        10);
+
+
+
+
+
+private void SelectMarker(Marker marker)
+{
+    if (_selectedMarker == marker)
+    {
+        RaiseSelectedMarkerCoordinates(marker);
+        return;
+    }
+
+    ClearSelection();
+
+    _selectedMarker = marker;
+    _selectedMarker.IsSelected = true;
+
+    // Selected styles
+    var dotSymbol = new SimpleMarkerSymbol(
+        SimpleMarkerSymbolStyle.Circle,
+        Color.Yellow,
+        12);
+    dotSymbol.Outline = new SimpleLineSymbol(SimpleLineSymbolStyle.Solid, Color.Black, 2);
+
+    var circleSymbol = new SimpleLineSymbol(SimpleLineSymbolStyle.Dash, Color.Orange, 3);
+
+    _selectedMarker.DotGraphic.Symbol = dotSymbol;
+    _selectedMarker.CircleGraphic.Symbol = circleSymbol;
+
+    RaiseSelectedMarkerCoordinates(_selectedMarker);
+}
+
+private void ClearSelection()
+{
+    if (_selectedMarker == null)
+        return;
+
+    _selectedMarker.IsSelected = false;
+
+    var dotSymbol = new SimpleMarkerSymbol(
+        SimpleMarkerSymbolStyle.Circle,
+        Color.Red,
+        10);
+    dotSymbol.Outline = new SimpleLineSymbol(SimpleLineSymbolStyle.Solid, Color.White, 1);
+
+    var circleSymbol = new SimpleLineSymbol(SimpleLineSymbolStyle.Solid, Color.DeepSkyBlue, 2);
+
+    _selectedMarker.DotGraphic.Symbol = dotSymbol;
+    _selectedMarker.CircleGraphic.Symbol = circleSymbol;
+
+    _selectedMarker = null;
+}
+
+
+
+private Geometry CreateRadiusCircle(MapPoint centerMapPoint, double radiusMeters)
+{
+    // Project center to WGS84 for stable geodesic buffering
+    var centerWgs84 = (MapPoint)GeometryEngine.Project(centerMapPoint, SpatialReferences.Wgs84);
+
+    // Buffer in meters
+    var bufferWgs84 = GeometryEngine.BufferGeodetic(
+        centerWgs84,
+        radiusMeters,
+        LinearUnits.Meters,
+        double.NaN,
+        GeodeticCurveType.Geodesic);
+
+    // Project back to the map SR
+    return GeometryEngine.Project(bufferWgs84, mapView.SpatialReference);
+}
+
+
+
+private Marker CreateMarker(MapPoint mapPoint, double radiusMeters)
+{
+    var marker = new Marker
+    {
+        Id = Guid.NewGuid().ToString("N"),
+        Geolocation = mapPoint,
+        RadiusMeters = radiusMeters,
+        Draggable = true,
+        IsSelected = false
+    };
+
+    // Center dot
+    var dotSymbol = new SimpleMarkerSymbol(
+        SimpleMarkerSymbolStyle.Circle,
+        Color.Red,
+        10);
+
+    dotSymbol.Outline = new SimpleLineSymbol(SimpleLineSymbolStyle.Solid, Color.White, 1);
+
+    var dotGraphic = new Graphic(mapPoint, dotSymbol);
+
+    // Outer radius circle
+    var circleGeometry = CreateRadiusCircle(mapPoint, radiusMeters);
+    var circleSymbol = new SimpleLineSymbol(SimpleLineSymbolStyle.Solid, Color.DeepSkyBlue, 2);
+    var circleGraphic = new Graphic(circleGeometry, circleSymbol);
+
+    // Link graphics back to marker
+    dotGraphic.Attributes["MarkerId"] = marker.Id;
+    dotGraphic.Attributes["GraphicType"] = "Dot";
+
+    circleGraphic.Attributes["MarkerId"] = marker.Id;
+    circleGraphic.Attributes["GraphicType"] = "Circle";
+
+    marker.DotGraphic = dotGraphic;
+    marker.CircleGraphic = circleGraphic;
+
+    _markerOverlay.Graphics.Add(circleGraphic);
+    _markerOverlay.Graphics.Add(dotGraphic);
+
+    _markers.Add(marker);
+
+    return marker;
+}
