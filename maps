@@ -1,3 +1,19 @@
+private void MoveMarker(Marker marker, MapPoint newMapPoint, System.Windows.Point newScreenPoint)
+{
+    if (marker == null)
+        return;
+
+    marker.Geolocation = newMapPoint;
+    marker.ScreenPoint = newScreenPoint;
+
+    if (marker.DotGraphic != null)
+        marker.DotGraphic.Geometry = newMapPoint;
+
+    if (marker.CircleGraphic != null)
+        marker.CircleGraphic.Geometry = CreateRadiusCircle(newMapPoint, marker.RadiusMeters);
+}
+
+
 private async void MapView_MouseLeftButtonUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
 {
     try
