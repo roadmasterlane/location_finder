@@ -1,3 +1,49 @@
+private async void MapView_MouseLeftButtonUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
+{
+    try
+    {
+        var mouseUpPoint = e.GetPosition(mapView);
+
+        if (_isDragging && _dragMarker != null)
+        {
+            _isDragging = false;
+            _mouseDownOnMarker = false;
+            _dragMarker = null;
+
+            // restore normal map pan
+            mapView.InteractionOptions.IsPanEnabled = true;
+
+            e.Handled = true;
+            return;
+        }
+
+        Marker hitMarker = await HitTestMarkerAsync(mouseUpPoint);
+
+        if (!_mouseDownOnMarker && hitMarker == null)
+        {
+            var mapPoint = mapView.ScreenToLocation(mouseUpPoint);
+            if (mapPoint != null)
+            {
+                double radiusMeters = GetRadiusFromDropdown();
+                var marker = CreateMarker(mapPoint, radiusMeters);
+                marker.ScreenPoint = mouseUpPoint;
+                SelectMarker(marker);
+            }
+        }
+
+        _mouseDownOnMarker = false;
+        _isDragging = false;
+        _dragMarker = null;
+        mapView.InteractionOptions.IsPanEnabled = true;
+    }
+    catch (Exception ex)
+    {
+        mapView.InteractionOptions.IsPanEnabled = true;
+        System.Diagnostics.Debug.WriteLine(ex);
+    }
+}
+
+
 private void MapView_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
 {
     try
