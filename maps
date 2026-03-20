@@ -1,3 +1,29 @@
+
+using Esri.ArcGISRuntime.Geometry;
+using Esri.ArcGISRuntime.UI;
+using System.Windows;
+
+public class Marker
+{
+    public string Id { get; set; }
+    public MapPoint Geolocation { get; set; }          // stored in map SR (WebMercator in your case)
+    public Point ScreenPoint { get; set; }             // last known screen point
+    public bool Draggable { get; set; } = true;
+    public bool IsSelected { get; set; }
+
+    // visual settings
+    public double DotSizePixels { get; set; } = 10;
+    public double RadiusMeters { get; set; } = 50;
+
+    // ArcGIS graphics
+    public Graphic DotGraphic { get; set; }
+    public Graphic CircleGraphic { get; set; }
+}
+
+
+
+
+
 private void MapView_MouseMove(object sender, MouseEventArgs e)
 {
     if (!_dragging || _activeDot == null) return;
