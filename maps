@@ -1,3 +1,17 @@
+private void RaiseSelectedMarkerCoordinates(Marker marker)
+{
+    if (marker?.Geolocation == null)
+        return;
+
+    var wgs84 = (MapPoint)GeometryEngine.Project(
+        marker.Geolocation,
+        SpatialReferences.Wgs84);
+
+    SelectedMarkerWgs84Changed?.Invoke(wgs84.X, wgs84.Y);
+}
+
+
+
 
 using Esri.ArcGISRuntime.Geometry;
 using Esri.ArcGISRuntime.UI;
