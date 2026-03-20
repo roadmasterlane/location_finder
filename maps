@@ -1,3 +1,44 @@
+
+private async void MapView_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+{
+    try
+    {
+        mapView.Focus();
+
+        _mouseDownScreenPoint = e.GetPosition(mapView);
+        _mouseDownOnMarker = false;
+        _isDragging = false;
+        _dragMarker = null;
+
+        Marker hitMarker = await HitTestMarkerAsync(_mouseDownScreenPoint);
+
+        if (hitMarker != null)
+        {
+            SelectMarker(hitMarker);
+
+            if (hitMarker.Draggable)
+            {
+                _dragMarker = hitMarker;
+                _mouseDownOnMarker = true;
+            }
+
+            e.Handled = true;
+        }
+        else
+        {
+            ClearSelection();
+        }
+    }
+    catch (Exception ex)
+    {
+        System.Diagnostics.Debug.WriteLine(ex);
+    }
+}
+
+
+
+
+
 private void RaiseSelectedMarkerCoordinates(Marker marker)
 {
     if (marker?.Geolocation == null)
