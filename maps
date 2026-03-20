@@ -1,3 +1,47 @@
+private void MapView_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+{
+    try
+    {
+        if (!_mouseDownOnMarker || _dragMarker == null)
+            return;
+
+        if (e.LeftButton != System.Windows.Input.MouseButtonState.Pressed)
+            return;
+
+        var currentScreen = e.GetPosition(mapView);
+
+        double dx = currentScreen.X - _mouseDownScreenPoint.X;
+        double dy = currentScreen.Y - _mouseDownScreenPoint.Y;
+        double distance = Math.Sqrt(dx * dx + dy * dy);
+
+        if (!_isDragging)
+        {
+            if (distance < DragStartThresholdPixels)
+                return;
+
+            _isDragging = true;
+
+            // VERY IMPORTANT: stop map from panning while marker is dragged
+            mapView.InteractionOptions.IsPanEnabled = false;
+        }
+
+        var newMapPoint = mapView.ScreenToLocation(currentScreen);
+        if (newMapPoint == null)
+            return;
+
+        MoveMarker(_dragMarker, newMapPoint, currentScreen);
+        RaiseSelectedMarkerCoordinates(_dragMarker);
+
+        e.Handled = true;
+    }
+    catch (Exception ex)
+    {
+        System.Diagnostics.Debug.WriteLine(ex);
+    }
+}
+
+
+
 
 private async void MapView_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
 {
