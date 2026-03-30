@@ -1,3 +1,42 @@
+private void ShowTooltipForGraphic(Graphic graphic, string text)
+{
+    if (graphic.Geometry is not Esri.ArcGISRuntime.Geometry.MapPoint mapPoint)
+    {
+        HideTooltip();
+        return;
+    }
+
+    _tooltipLabel.Text = text;
+
+    var screenPoint = mapView.LocationToScreen(mapPoint);
+
+    int x = mapView.Left + (int)screenPoint.X - (_tooltipLabel.PreferredWidth / 2);
+    int y = mapView.Top + (int)screenPoint.Y - _tooltipLabel.PreferredHeight - 20;
+
+    _tooltipLabel.Location = new Point(Math.Max(0, x), Math.Max(0, y));
+    _tooltipLabel.Visible = true;
+    _tooltipLabel.BringToFront();
+}
+
+if (result.Graphics.Count > 0)
+{
+    Graphic g = result.Graphics[0];
+    string text = g.Attributes.ContainsKey("Tooltip")
+        ? Convert.ToString(g.Attributes["Tooltip"])
+        : "Marker";
+
+    ShowTooltipForGraphic(g, text);
+}
+else
+{
+    HideTooltip();
+}
+
+
+
+
+
+
 private void MoveMarker(Marker marker, MapPoint newMapPoint, System.Windows.Point newScreenPoint)
 {
     if (marker == null)
