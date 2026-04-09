@@ -1,3 +1,109 @@
+using Esri.ArcGISRuntime.Geometry;
+using Esri.ArcGISRuntime.UI;
+using Esri.ArcGISRuntime.UI.Controls;
+using System;
+using System.Drawing;
+using System.Windows.Forms;
+
+public partial class Form1 : Form
+{
+    private readonly ToolTip _toolTip = new ToolTip();
+    private GraphicsOverlay _markerOverlay;
+    private bool _hoverBusy;
+    private Graphic _lastHoveredGraphic;
+
+    public Form1()
+    {
+        InitializeComponent();
+
+        _toolTip.InitialDelay = 0;
+        _toolTip.ReshowDelay = 0;
+        _toolTip.AutoPopDelay = 5000;
+        _toolTip.ShowAlways = true;
+
+        mapView.MouseMove += MapView_MouseMove;
+        mapView.MouseLeave += (s, e) =>
+        {
+            _toolTip.Hide(mapView);
+            _lastHoveredGraphic = null;
+        };
+    }
+
+    private void SetupMarkers()
+    {
+        _markerOverlay = new GraphicsOverlay();
+        mapView.GraphicsOverlays.Add(_markerOverlay);
+
+        var pt = new MapPoint(-75.6972, 45.4215, SpatialReferences.Wgs84);
+        var symbol = new SimpleMarkerSymbol(SimpleMarkerSymbolStyle.Circle, Color.Red, 12);
+
+        var g = new Graphic(pt, symbol);
+        g.Attributes["Tooltip"] = "Ottawa marker";
+        _markerOverlay.Graphics.Add(g);
+    }
+
+    private async void MapView_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (_hoverBusy || _markerOverlay == null)
+            return;
+
+        _hoverBusy = true;
+
+        try
+        {
+            var result = await mapView.IdentifyGraphicsOverlayAsync(
+                _markerOverlay,
+                e.Location,
+                10,
+                false);
+
+            if (result.Graphics.Count == 0)
+            {
+                _toolTip.Hide(mapView);
+                _lastHoveredGraphic = null;
+                return;
+            }
+
+            var graphic = result.Graphics[0];
+
+            if (ReferenceEquals(graphic, _lastHoveredGraphic))
+                return;
+
+            _lastHoveredGraphic = graphic;
+
+            string text = graphic.Attributes.ContainsKey("Tooltip")
+                ? Convert.ToString(graphic.Attributes["Tooltip"])
+                : "Marker";
+
+            if (graphic.Geometry is MapPoint mapPoint)
+            {
+                var screenPoint = mapView.LocationToScreen(mapPoint);
+
+                int x = (int)screenPoint.X;
+                int y = (int)screenPoint.Y - 20;
+
+                _toolTip.Show(text, mapView, x, y, 3000);
+            }
+            else
+            {
+                _toolTip.Show(text, mapView, e.Location.X, e.Location.Y - 20, 3000);
+            }
+        }
+        catch
+        {
+            _toolTip.Hide(mapView);
+            _lastHoveredGraphic = null;
+        }
+        finally
+        {
+            _hoverBusy = false;
+        }
+    }
+}
+
+
+
+
 private void ShowTooltipForGraphic(Graphic graphic, string text)
 {
     if (graphic.Geometry is not Esri.ArcGISRuntime.Geometry.MapPoint mapPoint)
