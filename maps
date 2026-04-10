@@ -1,3 +1,47 @@
+using Esri.ArcGISRuntime.Geometry;
+using Esri.ArcGISRuntime.UI;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+
+private async Task ZoomToQueryMarkersAsync(
+    GraphicsOverlay overlay,
+    double paddingPixels = 60,
+    double singlePointScale = 10000)
+{
+    if (overlay == null || overlay.Graphics.Count == 0)
+        return;
+
+    // Keep only graphics that actually have geometry.
+    List<Geometry> geometries = overlay.Graphics
+        .Where(g => g?.Geometry != null)
+        .Select(g => g.Geometry)
+        .ToList();
+
+    if (geometries.Count == 0)
+        return;
+
+    // One marker: center and zoom to a chosen scale.
+    if (geometries.Count == 1 && geometries[0] is MapPoint onePoint)
+    {
+        await mapView.SetViewpointCenterAsync(onePoint, singlePointScale);
+        return;
+    }
+
+    // Build one envelope covering every graphic.
+    Envelope combinedExtent = geometries[0].Extent;
+
+    foreach (Geometry geometry in geometries.Skip(1))
+    {
+        combinedExtent = combinedExtent.Union(geometry.Extent);
+    }
+
+    await mapView.SetViewpointGeometryAsync(combinedExtent, paddingPixels);
+}
+
+
+
+
 private async Task SaveCurrentMapAsPngAsync()
 {
     try
