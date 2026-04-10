@@ -1,3 +1,32 @@
+private async Task SaveCurrentMapAsPngAsync()
+{
+    try
+    {
+        using var dlg = new SaveFileDialog
+        {
+            Title = "Save map image",
+            Filter = "PNG Image (*.png)|*.png",
+            FileName = $"Map_{DateTime.Now:yyyyMMdd_HHmmss}.png"
+        };
+
+        if (dlg.ShowDialog() != DialogResult.OK)
+            return;
+
+        var runtimeImage = await mapView.ExportImageAsync();
+        using var stream = await runtimeImage.GetEncodedBufferAsync();
+        using var image = System.Drawing.Image.FromStream(stream);
+
+        image.Save(dlg.FileName, System.Drawing.Imaging.ImageFormat.Png);
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show(ex.Message, "Save failed");
+    }
+}
+
+
+
+
 using Esri.ArcGISRuntime.Geometry;
 using Esri.ArcGISRuntime.UI;
 using Esri.ArcGISRuntime.UI.Controls;
