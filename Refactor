@@ -1,3 +1,164 @@
+
+private void InitializeMarkerOverlays()
+{
+    _markerDotOverlay = new GraphicsOverlay();
+    _markerCircleOverlay = new GraphicsOverlay();
+
+    var dotSymbol = new SimpleMarkerSymbol(SimpleMarkerSymbolStyle.Circle, Color.Red, 10);
+    dotSymbol.Outline = new SimpleLineSymbol(SimpleLineSymbolStyle.Solid, Color.White, 1);
+
+    var circleSymbol = new SimpleLineSymbol(SimpleLineSymbolStyle.Solid, Color.DeepSkyBlue, 2);
+
+    _markerDotOverlay.Renderer = new SimpleRenderer(dotSymbol);
+    _markerCircleOverlay.Renderer = new SimpleRenderer(circleSymbol);
+
+    mapView.GraphicsOverlays.Add(_markerCircleOverlay);
+    mapView.GraphicsOverlays.Add(_markerDotOverlay);
+}
+
+
+
+
+private Marker CreateMarker(MapPoint mapPoint, double radiusMeters)
+{
+    var marker = new Marker
+    {
+        Id = Guid.NewGuid().ToString("N"),
+        Geolocation = mapPoint,
+        RadiusMeters = radiusMeters,
+        Draggable = true,
+        IsSelected = false
+    };
+
+    var dotGraphic = new Graphic(mapPoint);
+    dotGraphic.Attributes["MarkerId"] = marker.Id;
+    dotGraphic.Attributes["GraphicType"] = "Dot";
+
+    var circleGraphic = new Graphic(CreateRadiusCircle(mapPoint, radiusMeters));
+    circleGraphic.Attributes["MarkerId"] = marker.Id;
+    circleGraphic.Attributes["GraphicType"] = "Circle";
+
+    marker.DotGraphic = dotGraphic;
+    marker.CircleGraphic = circleGraphic;
+
+    _markerDotOverlay.Graphics.Add(dotGraphic);
+    _markerCircleOverlay.Graphics.Add(circleGraphic);
+
+    _markers.Add(marker);
+
+    return marker;
+}
+
+
+
+
+private readonly Queue<Marker> _markerPool = new Queue<Marker>();
+
+private Marker GetOrCreateMarker(MapPoint mapPoint, double radiusMeters)
+{
+    if (_markerPool.Count > 0)
+    {
+        var marker = _markerPool.Dequeue();
+        UpdateMarkerGeometry(marker, mapPoint, radiusMeters);
+        marker.IsSelected = false;
+        marker.DotGraphic.Symbol = null;
+        return marker;
+    }
+
+    return CreateMarker(mapPoint, radiusMeters);
+}
+
+private void ReleaseMarker(Marker marker)
+{
+    _markerDotOverlay.Graphics.Remove(marker.DotGraphic);
+    _markerCircleOverlay.Graphics.Remove(marker.CircleGraphic);
+    _markers.Remove(marker);
+
+    _markerPool.Enqueue(marker);
+}
+
+
+
+
+private void SetMarkerSelected(Marker marker, bool isSelected)
+{
+    marker.IsSelected = isSelected;
+
+    if (isSelected)
+    {
+        marker.DotGraphic.Symbol = _selectedDotSymbol;
+    }
+    else
+    {
+        marker.DotGraphic.Symbol = null; // fall back to overlay renderer
+    }
+}
+
+
+
+
+private void UpdateMarkerGeometry(Marker marker, MapPoint newPoint, double radiusMeters)
+{
+    marker.Geolocation = newPoint;
+    marker.RadiusMeters = radiusMeters;
+
+    marker.DotGraphic.Geometry = newPoint;
+    marker.CircleGraphic.Geometry = CreateRadiusCircle(newPoint, radiusMeters);
+}
+
+
+
+private Marker CreateMarker(MapPoint mapPoint, double radiusMeters)
+{
+    var marker = new Marker
+    {
+        Id = Guid.NewGuid().ToString("N"),
+        Geolocation = mapPoint,
+        RadiusMeters = radiusMeters,
+        Draggable = true,
+        IsSelected = false
+    };
+
+    var dotGraphic = new Graphic(mapPoint);
+    dotGraphic.Attributes["MarkerId"] = marker.Id;
+    dotGraphic.Attributes["GraphicType"] = "Dot";
+
+    var circleGeometry = CreateRadiusCircle(mapPoint, radiusMeters);
+    var circleGraphic = new Graphic(circleGeometry);
+    circleGraphic.Attributes["MarkerId"] = marker.Id;
+    circleGraphic.Attributes["GraphicType"] = "Circle";
+
+    marker.DotGraphic = dotGraphic;
+    marker.CircleGraphic = circleGraphic;
+
+    _markerCircleOverlay.Graphics.Add(circleGraphic);
+    _markerDotOverlay.Graphics.Add(dotGraphic);
+
+    _markers.Add(marker);
+
+    return marker;
+}
+
+
+
+
+
+public class Marker
+{
+    public string Id { get; set; }
+    public MapPoint Geolocation { get; set; }
+    public double RadiusMeters { get; set; }
+    public bool Draggable { get; set; }
+    public bool IsSelected { get; set; }
+
+    public Graphic DotGraphic { get; set; }
+    public Graphic CircleGraphic { get; set; }
+}
+
+
+
+
+
 private GraphicsOverlay _markerDotOverlay;
 private GraphicsOverlay _markerCircleOverlay;
 
