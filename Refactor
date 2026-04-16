@@ -1,3 +1,113 @@
+
+private async Task InitializeBasemapAsync()
+{
+    const string serviceUrl =
+        "https://yourserver/arcgis/rest/services/YourBasemap/VectorTileServer";
+
+    var keep = new HashSet<string>
+    {
+        "Land", "Marine area", "Water area",
+        "Admin0 boundary", "Admin1 boundary",
+        "Highway", "Major road",
+        "City large", "Country large"
+    };
+
+    AppState.LiteStyleFolder = 
+        await VectorTileStyleHelper.BuildLiteStyleFolderAsync(serviceUrl, keep);
+    AppState.BasemapServiceUrl = serviceUrl;
+}
+
+private async Task InitializeMapAsync()
+{
+    var vtCache = new VectorTileCache(AppState.BasemapServiceUrl);
+    await vtCache.LoadAsync();
+
+    var resourceCache = new ItemResourceCache(AppState.LiteStyleFolder);
+    await resourceCache.LoadAsync();
+
+    var vtLayer = new ArcGISVectorTiledLayer(vtCache, resourceCache);
+    var basemap = new Basemap(vtLayer);
+    mapView.Map = new Map(basemap);
+}
+
+
+
+public static class VectorTileStyleHelper
+{
+    private static readonly HttpClient _http = new HttpClient();
+
+    public static async Task<string> BuildLiteStyleFolderAsync(
+        string vectorTileServiceUrl,
+        HashSet<string> layerIdsToKeep)
+    {
+        // 1. Fetch service metadata to find the style path
+        var serviceMetaUrl = $"{vectorTileServiceUrl.TrimEnd('/')}?f=json";
+        var serviceJson = await _http.GetStringAsync(serviceMetaUrl);
+        var serviceMeta = JObject.Parse(serviceJson);
+
+        var defaultStyles = serviceMeta["defaultStyles"]?.ToString() ?? "resources/styles";
+        var styleUrl = $"{vectorTileServiceUrl.TrimEnd('/')}/{defaultStyles.TrimStart('/')}/root.json";
+
+        // 2. Fetch and prune the style
+        var styleJson = await _http.GetStringAsync(styleUrl);
+        var style = JObject.Parse(styleJson);
+
+        var allLayers = (JArray)style["layers"];
+        var keep = new HashSet<string>(layerIdsToKeep, StringComparer.OrdinalIgnoreCase);
+
+        var filtered = new JArray(
+            allLayers.Where(l =>
+            {
+                var id = l["id"]?.ToString();
+                var sourceLayer = l["source-layer"]?.ToString();
+                return (id != null && keep.Contains(id)) ||
+                       (sourceLayer != null && keep.Contains(sourceLayer));
+            }));
+
+        System.Diagnostics.Debug.WriteLine(
+            $"Vector tile style pruned: {allLayers.Count} -> {filtered.Count} layers");
+
+        style["layers"] = filtered;
+
+        // 3. IMPORTANT: rewrite sprite/glyphs URLs to absolute service URLs
+        //    so the Runtime can still fetch them when our style is local.
+        RewriteRelativeUrl(style, "sprite", vectorTileServiceUrl);
+        RewriteRelativeUrl(style, "glyphs", vectorTileServiceUrl);
+
+        // 4. Write to the expected folder layout
+        var rootFolder = Path.Combine(
+            AppDomain.CurrentDomain.BaseDirectory, "LiteStyle");
+        var stylesFolder = Path.Combine(rootFolder, "styles");
+        Directory.CreateDirectory(stylesFolder);
+
+        var stylePath = Path.Combine(stylesFolder, "root.json");
+        File.WriteAllText(stylePath, style.ToString());
+
+        return rootFolder;  // pass this to ItemResourceCache
+    }
+
+    private static void RewriteRelativeUrl(JObject style, string key, string serviceUrl)
+    {
+        var token = style[key];
+        if (token == null) return;
+
+        var value = token.ToString();
+        if (string.IsNullOrEmpty(value)) return;
+
+        // If it's a relative path like "../sprites/sprite", make it absolute
+        if (value.StartsWith("../") || value.StartsWith("./") || !value.StartsWith("http"))
+        {
+            // Style lives at: {service}/resources/styles/root.json
+            // So "../sprites/sprite" resolves to: {service}/resources/sprites/sprite
+            var resourcesBase = $"{serviceUrl.TrimEnd('/')}/resources/";
+            var combined = new Uri(new Uri(resourcesBase), value.TrimStart('.', '/')).ToString();
+            style[key] = combined;
+        }
+    }
+}
+
+
+
 foreach (var l in allLayers)
     Debug.WriteLine($"{l["id"]}  ({l["type"]})  source-layer={l["source-layer"]}");
 
