@@ -1,3 +1,28 @@
+private async Task<Uri> BuildLiteStyleAsync(string serviceUrl)
+{
+    using var http = new HttpClient();
+    var styleJson = await http.GetStringAsync($"{serviceUrl}/resources/styles/root.json");
+    
+    var style = Newtonsoft.Json.Linq.JObject.Parse(styleJson);
+    var layers = (Newtonsoft.Json.Linq.JArray)style["layers"];
+    
+    // Keep only the layer types/IDs you actually need
+    var keep = new HashSet<string> { "land", "water", "roads-major", "boundaries", "labels-major" };
+    
+    var filtered = new Newtonsoft.Json.Linq.JArray(
+        layers.Where(l => keep.Contains(l["id"]?.ToString()) 
+                       || keep.Contains(l["source-layer"]?.ToString())));
+    
+    style["layers"] = filtered;
+    
+    var tempPath = Path.Combine(Path.GetTempPath(), "lite-style.json");
+    File.WriteAllText(tempPath, style.ToString());
+    return new Uri(tempPath);
+}
+
+
+
+
 
 private void InitializeMarkerOverlays()
 {
