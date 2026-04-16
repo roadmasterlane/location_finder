@@ -1,0 +1,35 @@
+private GraphicsOverlay _markerDotOverlay;
+private GraphicsOverlay _markerCircleOverlay;
+
+private readonly SimpleMarkerSymbol _selectedDotSymbol =
+    new SimpleMarkerSymbol(SimpleMarkerSymbolStyle.Circle, Color.Yellow, 12)
+    {
+        Outline = new SimpleLineSymbol(SimpleLineSymbolStyle.Solid, Color.Black, 1)
+    };
+
+private void InitializeMarkerOverlays()
+{
+    _markerDotOverlay = new GraphicsOverlay();
+    _markerCircleOverlay = new GraphicsOverlay();
+
+    var dotSymbol = new SimpleMarkerSymbol(
+        SimpleMarkerSymbolStyle.Circle,
+        Color.Red,
+        10);
+
+    dotSymbol.Outline = new SimpleLineSymbol(
+        SimpleLineSymbolStyle.Solid,
+        Color.White,
+        1);
+
+    var circleSymbol = new SimpleLineSymbol(
+        SimpleLineSymbolStyle.Solid,
+        Color.DeepSkyBlue,
+        2);
+
+    _markerDotOverlay.Renderer = new SimpleRenderer(dotSymbol);
+    _markerCircleOverlay.Renderer = new SimpleRenderer(circleSymbol);
+
+    mapView.GraphicsOverlays.Add(_markerCircleOverlay);
+    mapView.GraphicsOverlays.Add(_markerDotOverlay);
+}
