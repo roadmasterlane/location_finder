@@ -1,3 +1,27 @@
+public static class SharedMapProvider
+{
+    private static Map _sharedMap;
+    private static readonly object _lock = new object();
+
+    public static Map GetMap()
+    {
+        lock (_lock)
+        {
+            if (_sharedMap == null)
+            {
+                _sharedMap = new Map(BasemapStyle.ArcGISTopographic);
+                // Add any shared layers ONCE here
+                // _sharedMap.OperationalLayers.Add(...);
+            }
+            return _sharedMap;
+        }
+    }
+}
+
+
+
+
+
 
 private async Task InitializeBasemapAsync()
 {
